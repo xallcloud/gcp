@@ -19,7 +19,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 //NotificationAdd method that
-func NotificationAdd(ctx context.Context, client *datastore.Client, not *dst.Notification) (*datastore.Key, error) {
+func NotificationAdd(ctx context.Context, client *datastore.Client, not *dst.Notification) (*dst.Notification, error) {
 
 	// Unique ID for Notification ID
 	uid := uuid.New()
@@ -39,7 +39,16 @@ func NotificationAdd(ctx context.Context, client *datastore.Client, not *dst.Not
 
 	// do the insert
 	key := datastore.IncompleteKey(dst.KindNotifications, nil)
-	return client.Put(ctx, key, n)
+
+	dskey, err := client.Put(ctx, key, n)
+
+	if err != nil || key == nil {
+		return nil, err
+	}
+
+	n.ID = dskey.ID
+
+	return n, nil
 }
 
 // NotificationsGetByAcID will return the list of notifications with the same acID

@@ -25,7 +25,7 @@ func EventAdd(ctx context.Context, client *datastore.Client, ev *dst.Event) (*da
 	uid := uuid.New()
 
 	// copy to new record
-	n := &dst.Event{
+	e := &dst.Event{
 		EvID:          uid.String(),
 		NtID:          ev.NtID,
 		CpID:          ev.CpID,
@@ -39,7 +39,7 @@ func EventAdd(ctx context.Context, client *datastore.Client, ev *dst.Event) (*da
 
 	// do the insert
 	key := datastore.IncompleteKey(dst.KindEvents, nil)
-	return client.Put(ctx, key, n)
+	return client.Put(ctx, key, e)
 }
 
 // EventsGetByCpID will return the list of events with the same cpID
