@@ -92,7 +92,8 @@ func EventsGetByAcID(ctx context.Context, client *datastore.Client, acID string)
 
 	var events []*dst.Event
 	query := datastore.NewQuery(dst.KindEvents).
-		Filter("ntID =", nts[0].NtID)
+		Filter("ntID =", nts[0].NtID).
+		Order("created")
 
 	log.Println("[EventsGetByAcID] will perform query")
 
