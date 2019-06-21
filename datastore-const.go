@@ -19,3 +19,6 @@ const EvTypeStart = "start"
 
 // EvSubTypeStartStep1 indicates the begining of a notification
 const EvSubTypeStartStep1 = "1"
+
+// EvTypeServices indicates the begining of a notification
+const EvTypeServices = "services"
