@@ -69,6 +69,48 @@ func EventsGetByCpID(ctx context.Context, client *datastore.Client, cpID string)
 	return events, nil
 }
 
+// EventsGetByAcID will return the list of events with the same cpID
+func EventsGetByAcID(ctx context.Context, client *datastore.Client, acID string) ([]*dst.Event, error) {
+	// Create a query to fetch all Task entities, ordered by "created".
+
+	log.Println("[EventsGetByAcID] will filter by acID:", acID)
+
+	log.Println("[EventsGetByAcID] first get matching notification based on acID:", acID)
+
+	// first check if there already exists this Action ID in notifications:
+	nts, err := NotificationsGetByAcID(ctx, client, acID)
+	if err != nil {
+		return nil, err
+	}
+
+	// it has no matching action. Return empty
+	if len(nts) <= 0 {
+		return nil, nil
+	}
+
+	log.Println("[EventsGetByAcID] will filter by NtID:", nts[0].NtID)
+
+	var events []*dst.Event
+	query := datastore.NewQuery(dst.KindEvents).
+		Filter("ntID =", nts[0].NtID)
+
+	log.Println("[EventsGetByAcID] will perform query")
+
+	keys, err := client.GetAll(ctx, query, &events)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("[EventsGetByAcID] Total keys returned", len(keys))
+
+	// Set the ID field on each Event from the corresponding key.
+	for i, key := range keys {
+		events[i].ID = key.ID
+	}
+
+	return events, nil
+}
+
 // EventsListAll returns all the events in ascending order of creation time.
 func EventsListAll(ctx context.Context, client *datastore.Client) ([]*dst.Event, error) {
 	var evs []*dst.Event
