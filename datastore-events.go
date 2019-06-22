@@ -32,7 +32,7 @@ func EventAdd(ctx context.Context, client *datastore.Client, ev *dst.Event) (*da
 		DvID:          ev.DvID,
 		Visibility:    ev.Visibility,
 		EvType:        ev.EvType,
-		EvSubType:     ev.EvSubType + appVersion,
+		EvSubType:     ev.EvSubType,
 		EvDescription: ev.EvDescription,
 		Created:       time.Now(),
 	}
