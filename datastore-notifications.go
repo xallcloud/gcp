@@ -14,17 +14,11 @@ import (
 	dst "github.com/xallcloud/api/datastore"
 )
 
-////////////////////////////////////////////////////////////////////////////////////////////////
-/// Notifications
-////////////////////////////////////////////////////////////////////////////////////////////////
-
-//NotificationAdd method that
+//NotificationAdd will add a new notifications to the datastore database
 func NotificationAdd(ctx context.Context, client *datastore.Client, not *dst.Notification) (*dst.Notification, error) {
-
-	// Unique ID for Notification ID
+	// Generate a new Unique ID for the notification
 	uid := uuid.New()
-
-	// copy to new record
+	// copy information into the datastore format
 	n := &dst.Notification{
 		NtID:          uid.String(),
 		AcID:          not.AcID,
@@ -36,64 +30,51 @@ func NotificationAdd(ctx context.Context, client *datastore.Client, not *dst.Not
 		Options:       not.Options,
 		Created:       time.Now(),
 	}
-
-	// do the insert
+	//do the insert into the database
 	key := datastore.IncompleteKey(dst.KindNotifications, nil)
-
 	dskey, err := client.Put(ctx, key, n)
-
 	if err != nil || key == nil {
 		return nil, err
 	}
-
+	// Set the ID field on each Event from the corresponding key.
 	n.ID = dskey.ID
-
 	return n, nil
 }
 
 // NotificationsGetByAcID will return the list of notifications with the same acID
 func NotificationsGetByAcID(ctx context.Context, client *datastore.Client, acID string) ([]*dst.Notification, error) {
-	// Create a query to fetch all Task entities, ordered by "created".
-
 	log.Println("[NotificationsGetByAcID] will filter by acID:", acID)
-
 	var notifications []*dst.Notification
-	query := datastore.NewQuery(dst.KindNotifications).
-		Filter("acID =", acID)
-
+	// Create a query to fetch all Events filtered by acID
+	query := datastore.NewQuery(dst.KindNotifications).Filter("acID =", acID)
 	log.Println("[NotificationsGetByAcID] will perform query")
-
 	keys, err := client.GetAll(ctx, query, &notifications)
 	if err != nil {
 		return nil, err
 	}
-
 	log.Println("[NotificationsGetByAcID] Total keys returned", len(keys))
-
 	// Set the ID field on each Notification from the corresponding key.
 	for i, key := range keys {
 		notifications[i].ID = key.ID
 	}
-
 	return notifications, nil
 }
 
 // NotificationsListAll returns all the notifications in ascending order of creation time.
 func NotificationsListAll(ctx context.Context, client *datastore.Client) ([]*dst.Notification, error) {
+	log.Println("[NotificationsListAll] Get all action records")
 	var notifications []*dst.Notification
-
 	// Create a query to fetch all Notifications entities, ordered by "created".
 	query := datastore.NewQuery(dst.KindNotifications).Order("created")
 	keys, err := client.GetAll(ctx, query, &notifications)
 	if err != nil {
 		return nil, err
 	}
-
+	log.Println("[NotificationsListAll] Total keys returned", len(keys))
 	// Set the id field on each Notifications from the corresponding DataStore key.
 	for i, key := range keys {
 		notifications[i].ID = key.ID
 	}
-
 	return notifications, nil
 }
 
@@ -112,14 +93,11 @@ func NotificationsToJSON(w io.Writer, notifications []*dst.Notification) {
 		"options": "%s",
 		"created": "%v"
 	}`
-
 	// Use a tab writer to help make results pretty.
 	tw := tabwriter.NewWriter(w, 4, 4, 1, ' ', 0) // Min cell size of 8.
-
 	var term = ""
 	fmt.Fprintf(tw, "[\n")
 	for _, n := range notifications {
-
 		fmt.Fprintf(tw, line, term,
 			n.ID,
 			n.NtID,
@@ -138,7 +116,7 @@ func NotificationsToJSON(w io.Writer, notifications []*dst.Notification) {
 	tw.Flush()
 }
 
-// NotificationToJSONString prints the callpoints into JSON to the given writer.
+// NotificationToJSONString prints a single notification into JSON to the given writer.
 func NotificationToJSONString(n *dst.Notification) string {
 	const line = `
 	{
@@ -153,7 +131,6 @@ func NotificationToJSONString(n *dst.Notification) string {
 		"options": "%s",
 		"created": "%v"
 	}`
-
 	r := fmt.Sprintf(line,
 		n.ID,
 		n.NtID,
@@ -166,6 +143,5 @@ func NotificationToJSONString(n *dst.Notification) string {
 		n.Options,
 		n.Created,
 	)
-
 	return r
 }

@@ -14,17 +14,11 @@ import (
 	dst "github.com/xallcloud/api/datastore"
 )
 
-////////////////////////////////////////////////////////////////////////////////////////////////
-/// Events
-////////////////////////////////////////////////////////////////////////////////////////////////
-
-//EventAdd method that
+//EventAdd will add a new Event to the datastore database
 func EventAdd(ctx context.Context, client *datastore.Client, ev *dst.Event) (*datastore.Key, error) {
-
-	// Unique ID for Event ID
+	// Generate a new Unique ID for the event
 	uid := uuid.New()
-
-	// copy to new record
+	// copy information into the datastore format
 	e := &dst.Event{
 		EvID:          uid.String(),
 		NtID:          ev.NtID,
@@ -36,133 +30,103 @@ func EventAdd(ctx context.Context, client *datastore.Client, ev *dst.Event) (*da
 		EvDescription: ev.EvDescription,
 		Created:       time.Now(),
 	}
-
-	// do the insert
+	//do the insert into the database
 	key := datastore.IncompleteKey(dst.KindEvents, nil)
 	return client.Put(ctx, key, e)
 }
 
 // EventsGetByCpID will return the list of events with the same cpID
 func EventsGetByCpID(ctx context.Context, client *datastore.Client, cpID string) ([]*dst.Event, error) {
-	// Create a query to fetch all Task entities, ordered by "created".
-
 	log.Println("[EventsGetByCpID] will filter by cpID:", cpID)
-
 	var events []*dst.Event
-	query := datastore.NewQuery(dst.KindEvents).
-		Filter("cpID =", cpID)
-
+	// Create a query to fetch all Events filtered by acID
+	query := datastore.NewQuery(dst.KindEvents).Filter("cpID =", cpID)
 	log.Println("[EventsGetByCpID] will perform query")
-
 	keys, err := client.GetAll(ctx, query, &events)
 	if err != nil {
 		return nil, err
 	}
-
 	log.Println("[EventsGetByCpID] Total keys returned", len(keys))
-
 	// Set the ID field on each Event from the corresponding key.
 	for i, key := range keys {
 		events[i].ID = key.ID
 	}
-
 	return events, nil
 }
 
-// EventsGetByAcID will return the list of events with the same cpID
+// EventsGetByAcID will return the list of events with the same acID
 func EventsGetByAcID(ctx context.Context, client *datastore.Client, acID string) ([]*dst.Event, error) {
-	// Create a query to fetch all Task entities, ordered by "created".
-
 	log.Println("[EventsGetByAcID] will filter by acID:", acID)
-
 	log.Println("[EventsGetByAcID] first get matching notification based on acID:", acID)
-
-	// first check if there already exists this Action ID in notifications:
-	nts, err := NotificationsGetByAcID(ctx, client, acID)
+	notifications, err := NotificationsGetByAcID(ctx, client, acID)
 	if err != nil {
 		return nil, err
 	}
-
-	// it has no matching action. Return empty
-	if len(nts) <= 0 {
+	// it has no matching notification. Return empty
+	if len(notifications) <= 0 {
 		return nil, nil
 	}
+	log.Println("[EventsGetByNtID] will filter by NtID:", notifications[0].NtID)
 
-	log.Println("[EventsGetByNtID] will filter by NtID:", nts[0].NtID)
-
+	// will contain all events with the same Action ID
+	var allEvents []*dst.Event
+	//will contain the events of each notification
 	var events []*dst.Event
-
-	var eventsFinal []*dst.Event
-
-	// Set the ID field on each Event from the corresponding key.
-	for _, not := range nts {
-
+	// for each notification, get all the events
+	for _, not := range notifications {
 		events, err = EventsGetByNtID(ctx, client, not.NtID)
 		if err != nil {
 			return nil, err
 		}
-
-		//append to final events array
+		//append to allevents array each individual result
 		if len(events) > 0 {
 			for _, e := range events {
-				eventsFinal = append(eventsFinal, e)
+				allEvents = append(allEvents, e)
 			}
 		}
-
 	}
-
-	return eventsFinal, nil
+	return allEvents, nil
 }
 
 // EventsGetByNtID will return the list of events with the same ntID
 func EventsGetByNtID(ctx context.Context, client *datastore.Client, ntID string) ([]*dst.Event, error) {
-	// Create a query to fetch all Task entities, ordered by "created".
-
 	log.Println("[EventsGetByNtID] will filter by ntID:", ntID)
-
 	var events []*dst.Event
-	query := datastore.NewQuery(dst.KindEvents).
-		Filter("ntID =", ntID).
-		Order("created")
-
+	// Create a query to fetch all Events filtered by acID
+	query := datastore.NewQuery(dst.KindEvents).Filter("ntID =", ntID).Order("created")
 	log.Println("[EventsGetByNtID] will perform query")
-
 	keys, err := client.GetAll(ctx, query, &events)
 	if err != nil {
 		return nil, err
 	}
-
 	log.Println("[EventsGetByNtID] Total keys returned", len(keys))
-
 	// Set the ID field on each Event from the corresponding key.
 	for i, key := range keys {
 		events[i].ID = key.ID
 	}
-
 	return events, nil
 }
 
 // EventsListAll returns all the events in ascending order of creation time.
 func EventsListAll(ctx context.Context, client *datastore.Client) ([]*dst.Event, error) {
-	var evs []*dst.Event
-
+	log.Println("[EventsListAll] Get all events records")
+	var events []*dst.Event
 	// Create a query to fetch all Events entities, ordered by "created".
 	query := datastore.NewQuery(dst.KindEvents).Order("created")
-	keys, err := client.GetAll(ctx, query, &evs)
+	keys, err := client.GetAll(ctx, query, &events)
 	if err != nil {
 		return nil, err
 	}
-
+	log.Println("[EventsListAll] Total keys returned", len(keys))
 	// Set the id field on each Events from the corresponding DataStore key.
 	for i, key := range keys {
-		evs[i].ID = key.ID
+		events[i].ID = key.ID
 	}
-
-	return evs, nil
+	return events, nil
 }
 
 // EventsToJSON prints the events into JSON to the given writer.
-func EventsToJSON(w io.Writer, evs []*dst.Event) {
+func EventsToJSON(w io.Writer, events []*dst.Event) {
 	const line = `%s
 	{
 		"ID": %d,
@@ -176,14 +140,11 @@ func EventsToJSON(w io.Writer, evs []*dst.Event) {
 		"evDescription": "%s",
 		"created": "%v"
 	}`
-
 	// Use a tab writer to help make results pretty.
 	tw := tabwriter.NewWriter(w, 4, 4, 1, ' ', 0) // Min cell size of 8.
-
 	var term = ""
 	fmt.Fprintf(tw, "[\n")
-	for _, d := range evs {
-
+	for _, d := range events {
 		fmt.Fprintf(tw, line, term,
 			d.ID,
 			d.EvID,
@@ -217,7 +178,6 @@ func EventToJSONString(d *dst.Event) string {
 		"evDescription": "%s",
 		"created": "%v"
 	}`
-
 	r := fmt.Sprintf(line,
 		d.ID,
 		d.EvID,
@@ -230,6 +190,5 @@ func EventToJSONString(d *dst.Event) string {
 		d.EvDescription,
 		d.Created,
 	)
-
 	return r
 }

@@ -1,7 +1,6 @@
 package gcp
 
-//This package will contain all helper function to deal with
-// the google pubsub service
+//This file will contain all helper function to deal with the google pubsub service
 
 import (
 	"context"
@@ -14,21 +13,18 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-//CreateTopic Create a topic if it does not exist. Otherwise, return the current existin one.
+//CreateTopic Creates a topic if it does not exist. Otherwise, return the current existin one.
 func CreateTopic(topic string, client *pubsub.Client) (*pubsub.Topic, error) {
 	ctx := context.Background()
-
 	// Create a topic to subscribe to.
 	t := client.Topic(topic)
 	exists, err := t.Exists(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize topic '%s'. %v", t, err)
 	}
-
 	if exists {
 		return t, nil
 	}
-
 	t, err = client.CreateTopic(ctx, topic)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create topic '%s'. %v", t, err)
@@ -39,7 +35,6 @@ func CreateTopic(topic string, client *pubsub.Client) (*pubsub.Topic, error) {
 //ListSubs will return the available subscriptions
 func ListSubs(client *pubsub.Client) ([]*pubsub.Subscription, error) {
 	ctx := context.Background()
-	// [START pubsub_list_subscriptions]
 	var subs []*pubsub.Subscription
 	it := client.Subscriptions(ctx)
 	for {
@@ -52,7 +47,6 @@ func ListSubs(client *pubsub.Client) ([]*pubsub.Subscription, error) {
 		}
 		subs = append(subs, s)
 	}
-	// [END pubsub_list_subscriptions]
 	return subs, nil
 }
 
@@ -62,7 +56,6 @@ func CreateSub(client *pubsub.Client, subName string, topic *pubsub.Topic) (*pub
 	// Get Subscriptions
 	var err error
 	var subs []*pubsub.Subscription
-
 	subs, err = ListSubs(client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list subscriptions. %v", err)
@@ -75,23 +68,19 @@ func CreateSub(client *pubsub.Client, subName string, topic *pubsub.Topic) (*pub
 		}
 	}
 	ctx := context.Background()
-
 	var sub *pubsub.Subscription
-	//TODO: For now, leave the AckDeadline to 20 seconds. Need to make it configurable
 	sub, err = client.CreateSubscription(ctx, subName, pubsub.SubscriptionConfig{
 		Topic:             topic,
-		RetentionDuration: 48 * time.Hour,
+		RetentionDuration: 1 * time.Hour,
 		AckDeadline:       600 * time.Second,
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed create subscription. %v", err)
 	}
-	// [END pubsub_create_pull_subscription]
 	return sub, nil
 }
 
-//DeleteSubscription will delete the subscription from google pub/sub
+//DeleteSubscription will delete the subscription
 func DeleteSubscription(client *pubsub.Client, subName string) error {
 	ctx := context.Background()
 	sub := client.Subscription(subName)

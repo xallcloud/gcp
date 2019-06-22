@@ -14,25 +14,19 @@ import (
 	dst "github.com/xallcloud/api/datastore"
 )
 
-////////////////////////////////////////////////////////////////////////////////////////////////
-/// Assignments
-////////////////////////////////////////////////////////////////////////////////////////////////
-
-//AssignmentAdd method that
+//AssignmentAdd will add a new assignments to the datastore database
 func AssignmentAdd(ctx context.Context, client *datastore.Client, asgn *dst.Assignment) (*datastore.Key, error) {
 
-	// first check if there already exists this Callpoint ID:
-	asgns, err := AssignmentGetByAsID(ctx, client, asgn.AsID)
+	// first check if there already exists this Assignment by asID:
+	assignmnets, err := AssignmentGetByAsID(ctx, client, asgn.AsID)
 	if err != nil {
 		return nil, err
 	}
-
-	// if has already the value, return key and error
-	if len(asgns) > 0 {
-		return &datastore.Key{ID: asgns[0].ID, Kind: dst.KindAssignments}, fmt.Errorf("asID allready exists. %d", asgns[0].ID)
+	// if it has already the value, return key and error
+	if len(assignmnets) > 0 {
+		return &datastore.Key{ID: assignmnets[0].ID, Kind: dst.KindAssignments}, fmt.Errorf("asID allready exists. %d", assignmnets[0].ID)
 	}
-
-	// copy to new record
+	// copy information into the datastore format
 	n := &dst.Assignment{
 		AsID:        asgn.AsID,
 		Created:     time.Now(),
@@ -44,71 +38,47 @@ func AssignmentAdd(ctx context.Context, client *datastore.Client, asgn *dst.Assi
 		Settings:    asgn.Settings,
 		RawRequest:  asgn.RawRequest,
 	}
-
-	// do the insert
+	//do the insert into the database
 	key := datastore.IncompleteKey(dst.KindAssignments, nil)
 	return client.Put(ctx, key, n)
 }
 
-// AssignmentGetByAsID will return the list of devices with the same dvID
+// AssignmentGetByAsID will return the list of assignments with the same asID
 func AssignmentGetByAsID(ctx context.Context, client *datastore.Client, asID string) ([]*dst.Assignment, error) {
-	// Create a query to fetch all Task entities, ordered by "created".
-
 	log.Println("[AssignmentGetByAsID] will filter by asID:", asID)
-
 	var assignments []*dst.Assignment
-	query := datastore.NewQuery(dst.KindAssignments).
-		Filter("asID =", asID)
-
-	log.Println("[AssignmentGetByAsID] will perform query")
-
+	// Create a query to fetch all Assignments filtered by asID
+	query := datastore.NewQuery(dst.KindAssignments).Filter("asID =", asID)
 	keys, err := client.GetAll(ctx, query, &assignments)
 	if err != nil {
 		return nil, err
 	}
-
 	log.Println("[AssignmentGetByAsID] Total keys returned", len(keys))
-
 	// Set the ID field on each Assignment from the corresponding key.
 	for i, key := range keys {
 		assignments[i].ID = key.ID
 	}
-
 	return assignments, nil
 }
 
 // AssignmentsByCpID will return the list of assignments and its information with the same cpID
 func AssignmentsByCpID(ctx context.Context, client *datastore.Client, cpID string) ([]*dst.Assignment, error) {
-	// Create a query to fetch all Task entities, ordered by "created".
-
 	log.Println("[AssignmentsByCpID] will filter by cpID:", cpID)
-
 	var assignments []*dst.Assignment
-	query := datastore.NewQuery(dst.KindAssignments).
-		Filter("cpID =", cpID)
-
-	log.Println("[AssignmentsByCpID] will perform query")
-
+	// Create a query to fetch all Actions entities, ordered by "created".
+	query := datastore.NewQuery(dst.KindAssignments).Filter("cpID =", cpID)
 	keys, err := client.GetAll(ctx, query, &assignments)
 	if err != nil {
 		return nil, err
 	}
-
 	log.Println("[AssignmentsByCpID] Total keys returned", len(keys))
-
-	// Set the ID field on each Callpoint from the corresponding key.
+	// Set the ID field on each assignments from the corresponding key.
 	for i, key := range keys {
 		assignments[i].ID = key.ID
-
 	}
-
-	//////////////////////////////////////////////////////////////////
-	// extra: Get information from the full objects
-	//////////////////////////////////////////////////////////////////
-
+	// Get device and callpoint associated to each assignment
 	for i, a := range assignments {
-
-		// Load Callpoint information
+		// Load Callpoint information from database
 		cps, err := CallpointGetByCpID(ctx, client, a.CpID)
 		if err == nil && len(cps) > 0 {
 			assignments[i].CallpointObj.CpID = cps[0].CpID
@@ -119,8 +89,7 @@ func AssignmentsByCpID(ctx context.Context, client *datastore.Client, cpID strin
 			assignments[i].CallpointObj.Icon = cps[0].Icon
 			assignments[i].CallpointObj.Description = cps[0].Description
 		}
-
-		// Load Device information
+		// Load Device information from database
 		dvs, err := DeviceGetByDvID(ctx, client, a.DvID)
 		if err == nil && len(dvs) > 0 {
 			assignments[i].DeviceObj.DvID = dvs[0].DvID
@@ -135,7 +104,6 @@ func AssignmentsByCpID(ctx context.Context, client *datastore.Client, cpID strin
 			assignments[i].DeviceObj.RawRequest = dvs[0].RawRequest
 		}
 	}
-
 	return assignments, nil
 }
 
@@ -156,23 +124,18 @@ func AssignmentsToJSON(w io.Writer, asgs []*dst.Assignment) {
 		"callpoint": %s,
 		"device": %s
 	}`
-
 	// Use a tab writer to help make results pretty.
 	tw := tabwriter.NewWriter(w, 4, 4, 1, ' ', 0) // Min cell size of 8.
-
 	var term = ""
 	var rawRequest, rawCallpoint, rawDevice string
 	fmt.Fprintf(tw, "[\n")
 	for _, a := range asgs {
 		rawRequest = strings.TrimSpace(a.RawRequest)
-
 		if rawRequest == "" {
 			rawRequest = "null"
 		}
-
 		rawCallpoint = CallpointToJSONString(&a.CallpointObj)
 		rawDevice = DeviceToJSONString(&a.DeviceObj)
-
 		fmt.Fprintf(tw, line, term,
 			a.ID,
 			a.AsID,

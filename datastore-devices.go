@@ -14,25 +14,18 @@ import (
 	dst "github.com/xallcloud/api/datastore"
 )
 
-////////////////////////////////////////////////////////////////////////////////////////////////
-/// Devices
-////////////////////////////////////////////////////////////////////////////////////////////////
-
-//DeviceAdd method that
+//DeviceAdd will add a new device to the datastore database
 func DeviceAdd(ctx context.Context, client *datastore.Client, dv *dst.Device) (*datastore.Key, error) {
-
-	// first check if there already exists this Callpoint ID:
-	cps, err := DeviceGetByDvID(ctx, client, dv.DvID)
+	// first check if there already exists this Device by dvID:
+	devices, err := DeviceGetByDvID(ctx, client, dv.DvID)
 	if err != nil {
 		return nil, err
 	}
-
-	// if has already the value, return key and error
-	if len(cps) > 0 {
-		return &datastore.Key{ID: cps[0].ID, Kind: dst.KindCallpoints}, fmt.Errorf("dvID allready exists. %d", cps[0].ID)
+	// if it has already the value, return key and error
+	if len(devices) > 0 {
+		return &datastore.Key{ID: devices[0].ID, Kind: dst.KindCallpoints}, fmt.Errorf("dvID allready exists. %d", devices[0].ID)
 	}
-
-	// copy to new record
+	// copy information into the datastore format
 	n := &dst.Device{
 		DvID:        dv.DvID,
 		Created:     time.Now(),
@@ -47,56 +40,46 @@ func DeviceAdd(ctx context.Context, client *datastore.Client, dv *dst.Device) (*
 		Settings:    dv.Settings,
 		RawRequest:  dv.RawRequest,
 	}
-
-	// do the insert
+	//do the insert into the database
 	key := datastore.IncompleteKey(dst.KindDevices, nil)
 	return client.Put(ctx, key, n)
 }
 
 // DeviceGetByDvID will return the list of devices with the same dvID
 func DeviceGetByDvID(ctx context.Context, client *datastore.Client, dvID string) ([]*dst.Device, error) {
-	// Create a query to fetch all Task entities, ordered by "created".
-
 	log.Println("[DeviceGetByDvID] will filter by cpID:", dvID)
-
 	var devices []*dst.Device
-	query := datastore.NewQuery(dst.KindDevices).
-		Filter("dvID =", dvID)
-
+	// Create a query to fetch all Devices filtered by dvID
+	query := datastore.NewQuery(dst.KindDevices).Filter("dvID =", dvID)
 	log.Println("[DeviceGetByDvID] will perform query")
-
 	keys, err := client.GetAll(ctx, query, &devices)
 	if err != nil {
 		return nil, err
 	}
-
 	log.Println("[DeviceGetByDvID] Total keys returned", len(keys))
-
 	// Set the ID field on each Callpoint from the corresponding key.
 	for i, key := range keys {
 		devices[i].ID = key.ID
 	}
-
 	return devices, nil
 }
 
 // DevicesListAll returns all the devices in ascending order of creation time.
 func DevicesListAll(ctx context.Context, client *datastore.Client) ([]*dst.Device, error) {
-	var dvs []*dst.Device
-
+	log.Println("[DevicesListAll] Get all devices records")
+	var devices []*dst.Device
 	// Create a query to fetch all Devices entities, ordered by "created".
 	query := datastore.NewQuery(dst.KindDevices).Order("created")
-	keys, err := client.GetAll(ctx, query, &dvs)
+	keys, err := client.GetAll(ctx, query, &devices)
 	if err != nil {
 		return nil, err
 	}
-
+	log.Println("[DevicesListAll] Total keys returned", len(keys))
 	// Set the id field on each Devices from the corresponding DataStore key.
 	for i, key := range keys {
-		dvs[i].ID = key.ID
+		devices[i].ID = key.ID
 	}
-
-	return dvs, nil
+	return devices, nil
 }
 
 // DeviceDelete will delete a device from the datastore
@@ -104,8 +87,8 @@ func DeviceDelete(ctx context.Context, client *datastore.Client, dvKeyID int64) 
 	return client.Delete(ctx, datastore.IDKey(dst.KindDevices, dvKeyID, nil))
 }
 
-// DevicesToJSON prints the callpoints into JSON to the given writer.
-func DevicesToJSON(w io.Writer, dvs []*dst.Device) {
+// DevicesToJSON prints the devices into JSON to the given writer.
+func DevicesToJSON(w io.Writer, devices []*dst.Device) {
 	const line = `%s
 	{
 		"ID": %d,
@@ -123,28 +106,21 @@ func DevicesToJSON(w io.Writer, dvs []*dst.Device) {
 		"settings": %s,
 		"rawRequest": %s
 	}`
-
 	// Use a tab writer to help make results pretty.
 	tw := tabwriter.NewWriter(w, 4, 4, 1, ' ', 0) // Min cell size of 8.
-
 	var term = ""
 	var rawRequest, isTwoWayString string
 	fmt.Fprintf(tw, "[\n")
-	for _, d := range dvs {
+	for _, d := range devices {
 		rawRequest = strings.TrimSpace(d.RawRequest)
-
+		if rawRequest == "" {
+			rawRequest = "null"
+		}
 		if d.IsTwoWay {
 			isTwoWayString = "true"
 		} else {
 			isTwoWayString = "false"
 		}
-
-		//log.Println("[JSONNotifications] parameter raw:", raw)
-
-		if rawRequest == "" {
-			rawRequest = "null"
-		}
-
 		fmt.Fprintf(tw, line, term,
 			d.ID,
 			d.DvID,
@@ -167,7 +143,7 @@ func DevicesToJSON(w io.Writer, dvs []*dst.Device) {
 	tw.Flush()
 }
 
-// DeviceToJSONString prints the callpoints into JSON to the given writer.
+// DeviceToJSONString prints a single device into JSON to the given writer.
 func DeviceToJSONString(d *dst.Device) string {
 	const line = `
 	{
@@ -186,21 +162,16 @@ func DeviceToJSONString(d *dst.Device) string {
 		"settings": %s,
 		"rawRequest": %s
 	}`
-
 	rawRequest := strings.TrimSpace(d.RawRequest)
-
 	if rawRequest == "" {
 		rawRequest = "null"
 	}
-
 	isTwoWayString := ""
-
 	if d.IsTwoWay {
 		isTwoWayString = "true"
 	} else {
 		isTwoWayString = "false"
 	}
-
 	r := fmt.Sprintf(line,
 		d.ID,
 		d.DvID,
@@ -217,6 +188,5 @@ func DeviceToJSONString(d *dst.Device) string {
 		d.Settings,
 		rawRequest,
 	)
-
 	return r
 }
