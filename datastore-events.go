@@ -32,7 +32,7 @@ func EventAdd(ctx context.Context, client *datastore.Client, ev *dst.Event) (*da
 		DvID:          ev.DvID,
 		Visibility:    ev.Visibility,
 		EvType:        ev.EvType,
-		EvSubType:     ev.EvSubType,
+		EvSubType:     ev.EvSubType + appVersion,
 		EvDescription: ev.EvDescription,
 		Created:       time.Now(),
 	}
@@ -88,21 +88,51 @@ func EventsGetByAcID(ctx context.Context, client *datastore.Client, acID string)
 		return nil, nil
 	}
 
-	log.Println("[EventsGetByAcID] will filter by NtID:", nts[0].NtID)
+	log.Println("[EventsGetByNtID] will filter by NtID:", nts[0].NtID)
+
+	var events []*dst.Event
+
+	var eventsFinal []*dst.Event
+
+	// Set the ID field on each Event from the corresponding key.
+	for _, not := range nts {
+
+		events, err = EventsGetByNtID(ctx, client, not.NtID)
+		if err != nil {
+			return nil, err
+		}
+
+		//append to final events array
+		if len(events) > 0 {
+			for _, e := range events {
+				eventsFinal = append(eventsFinal, e)
+			}
+		}
+
+	}
+
+	return eventsFinal, nil
+}
+
+// EventsGetByNtID will return the list of events with the same ntID
+func EventsGetByNtID(ctx context.Context, client *datastore.Client, ntID string) ([]*dst.Event, error) {
+	// Create a query to fetch all Task entities, ordered by "created".
+
+	log.Println("[EventsGetByNtID] will filter by ntID:", ntID)
 
 	var events []*dst.Event
 	query := datastore.NewQuery(dst.KindEvents).
-		Filter("ntID =", nts[0].NtID).
+		Filter("ntID =", ntID).
 		Order("created")
 
-	log.Println("[EventsGetByAcID] will perform query")
+	log.Println("[EventsGetByNtID] will perform query")
 
 	keys, err := client.GetAll(ctx, query, &events)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Println("[EventsGetByAcID] Total keys returned", len(keys))
+	log.Println("[EventsGetByNtID] Total keys returned", len(keys))
 
 	// Set the ID field on each Event from the corresponding key.
 	for i, key := range keys {
