@@ -6,6 +6,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -88,4 +89,15 @@ func CreateSub(client *pubsub.Client, subName string, topic *pubsub.Topic) (*pub
 	}
 	// [END pubsub_create_pull_subscription]
 	return sub, nil
+}
+
+//DeleteSubscription will delete the subscription from google pub/sub
+func DeleteSubscription(client *pubsub.Client, subName string) error {
+	ctx := context.Background()
+	sub := client.Subscription(subName)
+	if err := sub.Delete(ctx); err != nil {
+		return err
+	}
+	log.Println("Subscription deleted.")
+	return nil
 }
